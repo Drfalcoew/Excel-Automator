@@ -1,0 +1,26 @@
+
+for row in range(1, _end_row - 1):
+    open_q = my_ws['F' + str(temp)].value
+    master_p = my_ws['H' + str(temp)].value
+    if open_q > master_p:
+        if master_p != 1:
+            my_ws['G' + str(temp)].fill = masterpack_fill  # filling OG cell range with blue color
+            print("Row", temp, "is a masterpack", end=", ")
+
+        r: int = int(int(open_q) / int(master_p))
+        if open_q % master_p is 0:
+            r = r - 1
+
+        for _ in range(r):
+            for j in range(1, 43):
+                my_ws['F' + str(temp)] = master_p
+                value_list.append(my_ws[str(get_column_letter(j)) + str(temp)].value)
+                my_ws['G' + str(my_ws.max_row - 1)].fill = masterpack_fill  # filling NEW cell range with blue color
+            value_list.clear()
+            my_ws.append(value_list)
+            # print(value_list)
+        value_list.clear()
+    temp -= 1
+    print("ROW =", temp)
+print("...Finished")
+my_wb.save('spreadsheet_NEW.xlsx')
