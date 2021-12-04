@@ -24,3 +24,12 @@ for row in range(1, _end_row - 1):
     print("ROW =", temp)
 print("...Finished")
 my_wb.save('spreadsheet_NEW.xlsx')
+
+____________
+...
+This is because cells are generally returned as rows, even if there is only one cell in each row. There are exceptions for single cells, rows and columns.
+
+However, when working programatically, it's generally best to use the methods:
+
+ws.iter_rows(min_col=2, max_col=2, min_row=7, max_row=16, values_only=True)
+from url: https://groups.google.com/g/openpyxl-users/c/IJ74lih4hv0?pli=1

@@ -7,16 +7,23 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Color, PatternFill, Font, Border
 
+
+#  getting info about workbook and active worksheet
 my_wb = load_workbook('spreadsheet_template_.xlsx')
 my_ws = my_wb.active
 end_row = my_ws.max_row
 end_col = my_ws.max_column
 my_ws.title = 'OG'
 
-my_wb.create_sheet("Fedex")
-my_wb.create_sheet("UPS")
 
-col = get_column_letter(end_col)
+#  setting up new worksheets for fedex and UPS
+my_wb.create_sheet("FEDEX")
+my_wb.create_sheet("UPS")
+fedex_worksheet = my_wb["FEDEX"]
+ups_worksheet = my_wb["UPS"]
+
+
+#  initializing var to blue filler color
 masterpack_fill = PatternFill(start_color='8497b0',
                               end_color='8497b0',
                               fill_type='solid')
@@ -38,22 +45,49 @@ def filter_red():
     print("...Finished")
 
 
+def move_over_sheet(data, sheet):
+    sheet.append(data)
+
+
 def filter_scac():
     #  move fedex and UPS to separate sheets
+    value_list = []
     fedex = "FXGR"
     ups = "UP"
     _end_row = my_ws.max_row
     temp = _end_row
+    sheet: Any
+    transfer: Bool
+
     print("Starting...")
     for row in range(1, _end_row):
-        scac_value = my_ws['AL' + str(temp)].value
+        transfer = False
+        sheet = None
+        scac_value = my_ws['AL' + str(temp)]. value
+
         if scac_value == "" or scac_value is None:
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
-        elif scac_value == fedex or scac_value[0:2] == ups:
+        elif scac_value == fedex:
+            #  move to fedex sheet
+            transfer = True
+            sheet = fedex_worksheet
+            print('A{} SCAC: {}. Transfering data'.format(temp, scac_value))
+        elif scac_value[0:2] == ups:
+            #  move to ups sheet
+            transfer = True
+            sheet = ups_worksheet
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
         else:
             my_ws.delete_rows(temp)
             print('A{} SCAC: {}. Deleting'.format(temp, scac_value))
+
+        if transfer:
+            value_list.clear()
+            for i in range(1, 43):
+                value_list.append(my_ws[str(get_column_letter(i)) + str(temp)].value)
+            print(value_list)
+            move_over_sheet(value_list, sheet)
+
         temp -= 1
     print("...Finished")
 
