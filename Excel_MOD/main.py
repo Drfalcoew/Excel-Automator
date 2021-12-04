@@ -12,6 +12,10 @@ my_ws = my_wb.active
 end_row = my_ws.max_row
 end_col = my_ws.max_column
 my_ws.title = 'OG'
+
+my_wb.create_sheet("Fedex")
+my_wb.create_sheet("UPS")
+
 col = get_column_letter(end_col)
 masterpack_fill = PatternFill(start_color='8497b0',
                               end_color='8497b0',
@@ -35,6 +39,7 @@ def filter_red():
 
 
 def filter_scac():
+    #  move fedex and UPS to separate sheets
     fedex = "FXGR"
     ups = "UP"
     _end_row = my_ws.max_row
@@ -78,6 +83,8 @@ def filter_customer_name():
     bj = "BJ'S WHOLESALE CLUB"
     walmart = "WALMART.COM EDI INVENTORY"
     scheels = "SCHEELS EDI"
+    walmart_1 = "WAL - MART - --- EDI"
+
     _end_row = my_ws.max_row
     temp = _end_row
     print("Starting...")
@@ -85,7 +92,7 @@ def filter_customer_name():
         customer_name = my_ws['AP' + str(temp)].value
         if customer_name == "" or customer_name is None:
             print('AP{} Customer Name: {}. Continuing'.format(temp, customer_name))
-        elif customer_name == dunhams or customer_name == bj or customer_name == walmart or customer_name == scheels:
+        elif customer_name == dunhams or customer_name == bj or customer_name == walmart or customer_name == scheels or customer_name == walmart_1:
             print('AP{} Customer Name: {}. Deleting'.format(temp, customer_name))
             my_ws.delete_rows(temp)
         else:
