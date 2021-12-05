@@ -3,12 +3,13 @@
 import re
 from typing import Any  # idk what these are. i needed to import them to specify types Bool and Any for some reason..?
 
+import Pandas_lib
 import openpyxl
 from openpyxl import Workbook, load_workbook
 from openpyxl.descriptors import Bool
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill
-
+import pandas as pd
 
 #  getting info about workbook and active worksheet
 my_wb = load_workbook('_original.xlsx')
@@ -363,7 +364,6 @@ def duplicate_and_masterpack():
     for sheet in sheets:
         duplicate_cartons(sheet)
         masterpacks(sheet)
-        sort_sheets(sheet)
 
 
 def move_headers():
@@ -376,35 +376,24 @@ def move_headers():
         sheet.append(header_row)
 
 
-def sort_sheets(sheet):
-    value_list = []
-    rows: dict = {}
-    order_numbers = []
-    _end_row = sheet.max_row
-    _temp = _end_row
-    print(f"ORDER NUMS SORTED FOR {sheet}:")
+def sort_sheets():
+    print("SORTING BULLSHIT")
+    _file_name = '_main.xlsx'
+    sheet_name = 'UPS'
 
-    for row in range(1, _end_row-1):  # loop 1; getting
-        order = str(sheet['B' + str(_temp)].value)
-        for i in range(1, 43):
-            value_list.append(sheet[str(get_column_letter(i)) + str(_temp)].value)
+    df = pd.read_excel('_main.xlsx', engine='openpyxl', sheet_name=sheet_name)
 
-        print(f"MY ORDER::::::: {order}")
-        print(f"VALUE LIST: {value_list}")
+    sorted = df.sort_values('ORDNO')
+    print(sorted)
 
-        rows[order] = value_list
-        order_numbers.append(order)
-        sheet.delete_rows(_temp)
-        print(rows.items())
+    workbook = openpyxl.load_workbook(_file_name)
+    writer = pd.ExcelWriter(_file_name, engine='openpyxl')
+    writer.book = workbook
+    writer.sheets = dict((ws.title, ws) for ws in workbook.worksheets)
+    sorted.to_excel(writer, sheet_name, index=False)
+    writer.save()
 
-        value_list.clear()
-        _temp -= 1
-
-    order_numbers[::-1].sort()
-
-    if len(order_numbers) > 0:
-        for name in order_numbers:  # loop 2; setting
-            sheet.append(rows[name])
+    #Pandas_lib.append_df_to_excel(_file_name, sorted, sheet_name='UPS', index=False)
 
 
 def filter_main():
@@ -427,6 +416,6 @@ def filter_main():
 
     # Sorting by product number
 
-
+    sort_sheets()
 
 filter_main()
