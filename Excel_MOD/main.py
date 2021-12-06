@@ -3,7 +3,6 @@
 import re
 from typing import Any  # idk what these are. i needed to import them to specify types Bool and Any for some reason..?
 
-import Pandas_lib
 import openpyxl
 from openpyxl import Workbook, load_workbook
 from openpyxl.descriptors import Bool
@@ -358,12 +357,13 @@ def masterpacks(sheet):
     print("...Finished")
 
 
-def duplicate_and_masterpack():
-    #sheets = [fedex_worksheet, ups_worksheet, ups_kohls_worksheet, fedex_kohls_worksheet]
-    sheets = [ups_worksheet]
+def duplicate_masterpack_and_sort():
+    sheets = [fedex_worksheet, ups_worksheet, ups_kohls_worksheet, fedex_kohls_worksheet]
+
     for sheet in sheets:
         duplicate_cartons(sheet)
         masterpacks(sheet)
+
 
 
 def move_headers():
@@ -376,24 +376,56 @@ def move_headers():
         sheet.append(header_row)
 
 
-def sort_sheets():
+def save():
+    try:
+        my_wb.save('_main.xlsx')
+    except:
+        print("ERROR saving to '_main.xlsx'")
+
+
+def sort_sheets():  # this screws up blue color for masterpacks, need to fill color only after sorts are complete
     print("SORTING BULLSHIT")
     _file_name = '_main.xlsx'
-    sheet_name = 'UPS'
+    sheet_names = ['FEDEX', 'UPS', 'FEDEX_KOHLS', 'UPS_KOHLS']
 
-    df = pd.read_excel('_main.xlsx', engine='openpyxl', sheet_name=sheet_name)
+    for sheet in sheet_names:
 
-    sorted = df.sort_values('ORDNO')
-    print(sorted)
+        df = pd.read_excel('_main.xlsx', engine='openpyxl', sheet_name=sheet)
 
-    workbook = openpyxl.load_workbook(_file_name)
-    writer = pd.ExcelWriter(_file_name, engine='openpyxl')
-    writer.book = workbook
-    writer.sheets = dict((ws.title, ws) for ws in workbook.worksheets)
-    sorted.to_excel(writer, sheet_name, index=False)
-    writer.save()
+        sorted = df.sort_values('PRDNO')
+        print(sorted)
 
-    #Pandas_lib.append_df_to_excel(_file_name, sorted, sheet_name='UPS', index=False)
+        workbook = openpyxl.load_workbook(_file_name)
+        writer = pd.ExcelWriter(_file_name, engine='openpyxl')
+        writer.book = workbook
+        writer.sheets = dict((ws.title, ws) for ws in workbook.worksheets)
+        sorted.to_excel(writer, sheet, index=False)
+        writer.save()
+    # Pandas_lib.append_df_to_excel(_file_name, sorted, sheet_name='UPS', index=False)
+
+
+def create_batches():
+    print("-----CREATING BATCHES------")
+    worksheet = fedex_worksheet  # assigning here just for testing. Later I will need to loop through each sheet, pref from outside the func sending a parameter.. cleaner
+    value_list = []
+
+    count: int  # Going to use this to count how many in a batch. if prod == nxt_prod * 10, insert line, otherwise... --> ?
+    prod: str
+    nxt_prod: str
+
+    _end_row = worksheet.max_row
+    temp = _end_row  # I think I can increment from top down on this one. otherwise (down to up) use temp to control flow
+    # I need to make sure to insert line on top of product * 10. so insert(row - count) (top) as well as insert(row) (bottom)
+
+    for row in range(2, _end_row):
+        print(row)
+        prod = worksheet['E' + str(row)].value
+        nxt_prod = worksheet['E' + str(row + 1)].value
+
+        if prod != nxt_prod:
+            print(prod, nxt_prod)
+            print(f"Inserting row at {row}")
+        # worksheet.insert_rows(row)
 
 
 def filter_main():
@@ -410,11 +442,11 @@ def filter_main():
     filter_spec()  # Special Instructions
     filter_ship_via()
 
-    duplicate_and_masterpack()  # Duplicating cartons / masterpacks on each sheet
+    duplicate_masterpack_and_sort()  # Duplicating cartons / masterpacks on each sheet
 
-    my_wb.save('_main.xlsx')
+    # create_batches()  # Rough draft
 
-    # Sorting by product number
+    save()
 
     sort_sheets()
 
