@@ -32,6 +32,9 @@ ups_kohls_worksheet = my_wb["UPS_KOHLS"]
 masterpack_fill = PatternFill(start_color='8497b0',
                               end_color='8497b0',
                               fill_type='solid')
+split_fill = PatternFill(start_color='66FF66',
+                         end_color='66FF66',
+                         fill_type='solid')
 
 
 def filter_red():
@@ -70,7 +73,6 @@ def filter_hot():
             main_ws.delete_rows(temp)
             move_over_sheet(value_list, my_wb['HOT'])
         temp -= 1
-
 
 
 def move_over_sheet(data, sheet):
@@ -330,7 +332,7 @@ def masterpacks(sheet):
 
         if open_q is not None and open_q > 1 and master_p != 1:
             print(f"Row {temp} is a masterpack")
-            #sheet['G' + str(temp)].fill = masterpack_fill  # filling OG cell range with blue color
+            # sheet['G' + str(temp)].fill = masterpack_fill  # filling OG cell range with blue color
 
             if open_q % master_p == 0 or open_q > master_p:
                 sheet['E' + str(temp)] = f"{prod}XMP"
@@ -356,7 +358,7 @@ def masterpacks(sheet):
 
                         print(value_list)
                         sheet.append(value_list)
-                        #sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
+                        # sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
 
                 else:  # Broken masterpack
                     for dup in range(r):
@@ -374,13 +376,12 @@ def masterpacks(sheet):
                         print(value_list)
                         value_list[6] = weight * value_list[5]
                         sheet.append(value_list)
-                        #sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
+                        # sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
         temp -= 1
     print("...Finished")
 
 
 def color_masterpacks():
-
     for sheet in my_wb.worksheets:
 
         _end_row = sheet.max_row
@@ -474,7 +475,46 @@ def create_batches():
         # worksheet.insert_rows(row)
 
 
+def gather_split_orders():
+    split_orders = list()
+    green = "FF66FF66"
+    print("GATHERING SPLIT ORDERS __________")
+    for sheet in my_wb.worksheets:
+
+        _end_row = sheet.max_row
+        temp = _end_row
+
+        for _ in range(1, _end_row - 1):
+            cell_bg = sheet['A' + str(temp)].fill.start_color.index
+            print(cell_bg)
+            if cell_bg == green:
+                print(f"Row {temp} is being collected on sheet: {sheet}")
+                split_orders.append(sheet['B' + str(temp)].value)
+
+            temp -= 1
+
+    return tuple(split_orders)
+
+
+def color_splits(split_orders):
+    if split_orders is not None:
+        print(split_orders)
+        for sheet in my_wb.worksheets:
+            for order in split_orders:
+                _end_row = sheet.max_row
+                print(f"{sheet} max row is: {sheet.max_row}")
+                for row in range(2, _end_row):
+                    _order = sheet['B' + str(row)].value
+                    print(row)
+                    print(f"Does Order {order} == {_order}?")
+                    if order == _order:
+                        print("Yes, filling with green")
+                        sheet['A' + str(row)].fill = split_fill
+                    else:
+                        print("No. Continuing")
+
 def filter_main():
+
     filter_red()
     filter_freight()  # TP, PI, P
     filter_zero_weights()
@@ -482,6 +522,9 @@ def filter_main():
     filter_char_osadx()
 
     move_headers()
+
+    split_orders = gather_split_orders()
+
 
     # Now transferring or deleting
     filter_hot()
@@ -497,6 +540,8 @@ def filter_main():
     sort_sheets()
 
     color_masterpacks()
+    color_splits(split_orders)
     save()
+
 
 filter_main()
