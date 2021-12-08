@@ -50,6 +50,29 @@ def filter_red():
     print("...Finished")
 
 
+def filter_hot():
+    value_list = []
+
+    print("FILTERING HOT ORDERS")
+    temp = main_ws.max_row
+    for row in range(1, main_ws.max_row):
+        value_list.clear()
+        spec = main_ws['AH' + str(temp)].value
+        if spec == "SHIP VIA OVERNIGHT" or spec == "SHIP VIA 2DAY":
+            print('AH{} SPEC INSTR: {}. HOT ORDER'.format(temp, spec))
+
+            if my_wb["RED"] is None:
+                my_wb.create_sheet("RED")
+
+            print(f"Moving row over to sheet {my_wb['HOT']}")
+            for i in range(1, 43):  # Copying original cell values
+                value_list.append(main_ws[str(get_column_letter(i)) + str(temp)].value)
+            main_ws.delete_rows(temp)
+            move_over_sheet(value_list, my_wb['HOT'])
+        temp -= 1
+
+
+
 def move_over_sheet(data, sheet):
     sheet.append(data)
 
@@ -307,7 +330,7 @@ def masterpacks(sheet):
 
         if open_q is not None and open_q > 1 and master_p != 1:
             print(f"Row {temp} is a masterpack")
-            sheet['G' + str(temp)].fill = masterpack_fill  # filling OG cell range with blue color
+            #sheet['G' + str(temp)].fill = masterpack_fill  # filling OG cell range with blue color
 
             if open_q % master_p == 0 or open_q > master_p:
                 sheet['E' + str(temp)] = f"{prod}XMP"
@@ -333,7 +356,7 @@ def masterpacks(sheet):
 
                         print(value_list)
                         sheet.append(value_list)
-                        sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
+                        #sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
 
                 else:  # Broken masterpack
                     for dup in range(r):
@@ -351,10 +374,25 @@ def masterpacks(sheet):
                         print(value_list)
                         value_list[6] = weight * value_list[5]
                         sheet.append(value_list)
-                        sheet['G' + str(
-                            sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
+                        #sheet['G' + str(sheet.max_row)].fill = masterpack_fill  # filling OG cell range with blue color
         temp -= 1
     print("...Finished")
+
+
+def color_masterpacks():
+
+    for sheet in my_wb.worksheets:
+
+        _end_row = sheet.max_row
+        temp = _end_row
+
+        for _ in range(1, _end_row - 1):
+            open_q = sheet['F' + str(temp)].value
+            if open_q > 1:
+                print(f"Row {temp} is being filled on sheet: {sheet}")
+                sheet['G' + str(temp)].fill = masterpack_fill
+
+            temp -= 1
 
 
 def duplicate_masterpack_and_sort():
@@ -365,14 +403,12 @@ def duplicate_masterpack_and_sort():
         masterpacks(sheet)
 
 
-
 def move_headers():
-    sheets = [fedex_worksheet, ups_worksheet, ups_kohls_worksheet, fedex_kohls_worksheet]
     header_row = []
     # Get header data
     for i in range(1, 43):
         header_row.append(main_ws[str(get_column_letter(i)) + str(1)].value)
-    for sheet in sheets:
+    for sheet in my_wb.worksheets:
         sheet.append(header_row)
 
 
@@ -387,19 +423,29 @@ def sort_sheets():  # this screws up blue color for masterpacks, need to fill co
     print("SORTING BULLSHIT")
     _file_name = '_main.xlsx'
     sheet_names = ['FEDEX', 'UPS', 'FEDEX_KOHLS', 'UPS_KOHLS']
+    sort_key: str
+    _sorted: Any
 
     for sheet in sheet_names:
 
         df = pd.read_excel('_main.xlsx', engine='openpyxl', sheet_name=sheet)
 
-        sorted = df.sort_values('PRDNO')
-        print(sorted)
+        if sheet is 'UPS':
+            sort_key = 'Customer Name'
+        else:
+            sort_key = 'PRDNO'
+        if sheet is 'FEDEX':
+            _sorted = df.sort_values(['freight terms', sort_key])
+        else:
+            _sorted = df.sort_values(sort_key)
+
+        print(_sorted)
 
         workbook = openpyxl.load_workbook(_file_name)
         writer = pd.ExcelWriter(_file_name, engine='openpyxl')
         writer.book = workbook
         writer.sheets = dict((ws.title, ws) for ws in workbook.worksheets)
-        sorted.to_excel(writer, sheet, index=False)
+        _sorted.to_excel(writer, sheet, index=False)
         writer.save()
     # Pandas_lib.append_df_to_excel(_file_name, sorted, sheet_name='UPS', index=False)
 
@@ -438,6 +484,7 @@ def filter_main():
     move_headers()
 
     # Now transferring or deleting
+    filter_hot()
     filter_scac()  # FXGR, UPS, etc.
     filter_spec()  # Special Instructions
     filter_ship_via()
@@ -445,9 +492,11 @@ def filter_main():
     duplicate_masterpack_and_sort()  # Duplicating cartons / masterpacks on each sheet
 
     # create_batches()  # Rough draft
-
     save()
 
     sort_sheets()
+
+    color_masterpacks()
+    save()
 
 filter_main()
