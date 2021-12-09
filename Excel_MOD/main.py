@@ -105,14 +105,19 @@ def filter_customer_name():
     walmart = "WALMART.COM EDI INVENTORY"
     scheels = "SCHEELS EDI"
     walmart_1 = "WAL - MART - --- EDI"
+    aafes = "AAFES CATALOG SALE"
+    qvc = "QVC EDI ONLY"
 
     _end_row = main_ws.max_row
     temp = _end_row
     print("Starting...")
     for row in range(1, _end_row):
         customer_name = main_ws['AP' + str(temp)].value
-        if customer_name == "" or customer_name is None:
-            print('AP{} Customer Name: {}. Continuing'.format(temp, customer_name))
+        if customer_name == aafes:
+            main_ws['AL' + str(temp)] = "FXGR"
+            print('AP{} Customer Name: {}. Marking as fedex'.format(temp, customer_name))
+        elif customer_name == qvc:
+            main_ws['X' + str(temp)].value = "UPS"
         elif customer_name == dunhams or customer_name == bj or customer_name == walmart or customer_name == scheels or customer_name == walmart_1:
             print('AP{} Customer Name: {}. Deleting'.format(temp, customer_name))
             main_ws.delete_rows(temp)
@@ -177,12 +182,14 @@ def filter_zero_weights():
     for row in range(1, _end_row):
         weight = main_ws['G' + str(temp)].value
         _master_p = main_ws['H{0}'.format(str(temp))].value
-        if weight == 0 or weight == 0.0 or weight == .0 or weight is None:
+        if weight == 0 or weight == 0.0 or weight == .0 or weight is None or weight == 0.01:
             print('G{} Weight: {}. Deleting'.format(temp, weight))
             main_ws.delete_rows(temp)
-        else:
+        elif 0.1 <= weight < 1:  # Between 0 and 1
+            main_ws['G' + str(temp)] = 1
+        else:  # Over 1 lb
             print('G{} Weight: {}. Continuing'.format(temp, weight))
-            main_ws['G' + str(temp)] = int("{:.0f}".format(weight))
+            main_ws['G' + str(temp)] = int("{:.0f}".format(weight))  # Formatting weight to 0 decimals
 
         if _master_p == 0:
             main_ws['H{0}'.format(str(temp))] = 1
@@ -384,6 +391,9 @@ def masterpacks(sheet):
 def color_masterpacks():
     for sheet in my_wb.worksheets:
 
+        if sheet.title == 'MAIN':
+            continue
+
         _end_row = sheet.max_row
         temp = _end_row
 
@@ -424,21 +434,19 @@ def sort_sheets():  # this screws up blue color for masterpacks, need to fill co
     print("SORTING BULLSHIT")
     _file_name = '_main.xlsx'
     sheet_names = ['FEDEX', 'UPS', 'FEDEX_KOHLS', 'UPS_KOHLS']
-    sort_key: str
     _sorted: Any
 
     for sheet in sheet_names:
 
+
         df = pd.read_excel('_main.xlsx', engine='openpyxl', sheet_name=sheet)
 
-        if sheet is 'UPS':
-            sort_key = 'Customer Name'
+        if sheet == 'FEDEX':
+            _sorted = df.sort_values(['freight terms', 'PRDNO'])
+        elif sheet == 'UPS':
+            _sorted = df.sort_values(['Customer Name', 'freight terms', 'PRDNO', 'ORDNO'])
         else:
-            sort_key = 'PRDNO'
-        if sheet is 'FEDEX':
-            _sorted = df.sort_values(['freight terms', sort_key])
-        else:
-            _sorted = df.sort_values(sort_key)
+            _sorted = df.sort_values('PRDNO')
 
         print(_sorted)
 
@@ -500,6 +508,8 @@ def color_splits(split_orders):
     if split_orders is not None:
         print(split_orders)
         for sheet in my_wb.worksheets:
+            if sheet.title == 'MAIN':
+                continue
             for order in split_orders:
                 _end_row = sheet.max_row
                 print(f"{sheet} max row is: {sheet.max_row}")
@@ -512,6 +522,56 @@ def color_splits(split_orders):
                         sheet['A' + str(row)].fill = split_fill
                     else:
                         print("No. Continuing")
+
+
+def filter_PR():
+    value_list = []
+    _end_row = main_ws.max_row
+    temp = _end_row
+    print("Starting...")
+    for row in range(1, _end_row):
+        state = main_ws['O' + str(temp)].value
+        if state == "PR":
+            print('O{} State: {}. Moving'.format(temp, state))
+
+            if my_wb["PR"] is None:
+                my_wb.create_sheet("PR")
+
+            print(f"Moving row over to sheet {my_wb['HOT']}")
+            for i in range(1, 43):  # Copying original cell values
+                value_list.append(main_ws[str(get_column_letter(i)) + str(temp)].value)
+            main_ws.delete_rows(temp)
+            try:
+                move_over_sheet(value_list, my_wb['PR'])
+            except:
+                print("Failed to move row over to 'PR'")
+        temp -= 1
+    print("...Finished")
+
+
+def rewrite_ups():
+    #  GROUND THIRD PARTY PROFILE PACKAGE PACKAGE
+    sheets = [ups_worksheet, ups_kohls_worksheet]
+    for sheet in sheets:
+        _end_row = sheet.max_row
+        temp = _end_row
+        print("Starting...")
+        for row in range(1, _end_row):
+            freight = ups_worksheet['Y' + str(temp)].value
+
+            if freight == 'TP':
+                ups_worksheet['Y' + str(temp)] = "THIRD PARTY"
+            else:
+                ups_worksheet['Y' + str(temp)] = "SHIPPER"
+
+            ups_worksheet['X' + str(temp)].value = 'GROUND'
+            ups_worksheet['Z' + str(temp)].value = ''
+            ups_worksheet['AA' + str(temp)].value = 'PACKAGE'
+            ups_worksheet['AB' + str(temp)].value = 'PACKAGE'
+
+            temp -= 1
+        print("...Finished")
+
 
 def filter_main():
 
@@ -528,6 +588,7 @@ def filter_main():
 
     # Now transferring or deleting
     filter_hot()
+    filter_PR()
     filter_scac()  # FXGR, UPS, etc.
     filter_spec()  # Special Instructions
     filter_ship_via()
@@ -541,6 +602,7 @@ def filter_main():
 
     color_masterpacks()
     color_splits(split_orders)
+    rewrite_ups()
     save()
 
 
