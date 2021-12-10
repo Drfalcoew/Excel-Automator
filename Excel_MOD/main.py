@@ -14,8 +14,8 @@ import pandas as pd
 my_wb = load_workbook('_original.xlsx')
 _original_ws = my_wb.active
 
-#main_wb: Workbook
-#_main_ws: main_wb.active
+main_wb: Workbook
+_main_ws: Any
 
 end_row = _original_ws.max_row
 end_col = _original_ws.max_column
@@ -48,6 +48,8 @@ def filter_red_new():
     _end_row = _original_ws.max_row
     temp = _end_row
     _file_name = '_original.xlsx'
+    global main_wb
+    global _main_ws
 
     print("Starting...")
 
@@ -77,9 +79,11 @@ def filter_red_new():
     df.to_excel(writer, sheet_name='Sheet1', index=False)
     writer.save()
     print("Finished")
+    main_wb = load_workbook("_main.xlsx")
+    _main_ws = main_wb.active
 
 
-def filter_red():
+def filter_red():  # Deprecated
     red = "FFFF0000"
     black = "FF424649"
     _end_row = _original_ws.max_row
@@ -101,10 +105,10 @@ def filter_hot():
     global red_header
 
     print("FILTERING HOT ORDERS")
-    temp = _original_ws.max_row
-    for row in range(1, _original_ws.max_row):
+    temp = _main_ws.max_row
+    for row in range(1, _main_ws.max_row):
         value_list.clear()
-        spec = _original_ws['AH' + str(temp)].value
+        spec = _main_ws['AH' + str(temp)].value
         if spec == "SHIP VIA OVERNIGHT" or spec == "SHIP VIA 2DAY":
             print('AH{} SPEC INSTR: {}. HOT ORDER'.format(temp, spec))
 
@@ -112,7 +116,7 @@ def filter_hot():
                 my_wb.create_sheet("RED")
                 if not red_header:
                     for i in range(1, 43):
-                        header_row.append(_original_ws[str(get_column_letter(i)) + str(1)].value)
+                        header_row.append(_main_ws[str(get_column_letter(i)) + str(1)].value)
                     try:
                         my_wb["RED"].append(header_row)
                     except:
@@ -121,8 +125,8 @@ def filter_hot():
 
             print(f"Moving row over to sheet {my_wb['RED']}")
             for i in range(1, 43):  # Copying original cell values
-                value_list.append(_original_ws[str(get_column_letter(i)) + str(temp)].value)
-            _original_ws.delete_rows(temp)
+                value_list.append(_main_ws[str(get_column_letter(i)) + str(temp)].value)
+            _main_ws.delete_rows(temp)
             move_over_sheet(value_list, my_wb['RED'])
         temp -= 1
 
@@ -135,17 +139,17 @@ def filter_freight():
     tp = "TP"
     p = "P"
     pi = "PI"
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     print("Starting...")
     for row in range(1, _end_row):
-        freight_value = _original_ws['Y' + str(temp)].value
+        freight_value = _main_ws['Y' + str(temp)].value
         if freight_value == "" or freight_value is None:
             print('A{} FREIGHT: {}. Continuing'.format(temp, freight_value))
         elif freight_value == tp or freight_value == p or freight_value == pi:
             print('A{} FREIGHT: {}. Continuing'.format(temp, freight_value))
         else:
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
             print('A{} FREIGHT: {}. Deleting'.format(temp, freight_value))
         temp -= 1
     print("...Finished")
@@ -160,19 +164,19 @@ def filter_customer_name():
     aafes = "AAFES CATALOG SALES"
     qvc = "QVC EDI ONLY"
 
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     print("Starting...")
     for row in range(1, _end_row):
-        customer_name = _original_ws['AP' + str(temp)].value
+        customer_name = _main_ws['AP' + str(temp)].value
         if customer_name == aafes:
-            _original_ws['AL' + str(temp)] = "FXGR"
+            _main_ws['AL' + str(temp)] = "FXGR"
             print('AP{} Customer Name: {}. Marking as fedex'.format(temp, customer_name))
         elif customer_name == qvc:
-            _original_ws['X' + str(temp)].value = "UPS"
+            _main_ws['X' + str(temp)].value = "UPS"
         elif customer_name == dunhams or customer_name == bj or customer_name == walmart or customer_name == scheels or customer_name == walmart_1:
             print('AP{} Customer Name: {}. Deleting'.format(temp, customer_name))
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
         else:
             print('A{} Customer Name: {}. Continuing'.format(temp, customer_name))
         temp -= 1
@@ -185,7 +189,7 @@ def filter_spec():
     esfww = "SHIP VIA EFWW-ESTES FORWARDING WW"
 
     kohls = "KOHLS DROP SHIP EDI"
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     sheet: Any
     transfer: Bool
@@ -193,14 +197,14 @@ def filter_spec():
     for row in range(1, _end_row):
         transfer = False
         value_list.clear()
-        spec = _original_ws['AH' + str(temp)].value
-        cust = _original_ws['AP' + str(temp)].value
+        spec = _main_ws['AH' + str(temp)].value
+        cust = _main_ws['AP' + str(temp)].value
 
         if spec == "" or spec is None:
             print('AH{} SPEC INSTR: {}. Continuing'.format(temp, spec))
         elif spec == esfww or spec == pilot:
             print('AH{} SPEC INSTR: {}. Deleting'.format(temp, spec))
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
         else:
             if spec == "SHIP VIA FEDEX HOME DELV" or spec == "SHIP VIA FEDEX GND" or spec == "SHIP VIA FEDERAL EX-STANDARD GROUND" or spec == "SHIP VIA FEDEX HOME DELIVERY" or spec == "SHIP VIA FEDEX HOME DELIVERY FEDH" or spec == "SHIP VIA FEDERAL EX-GROUND":
                 transfer = True
@@ -219,8 +223,8 @@ def filter_spec():
         if transfer:
             print(f"Moving row over to sheet {sheet}")
             for i in range(1, 43):  # Copying original cell values
-                value_list.append(_original_ws[str(get_column_letter(i)) + str(temp)].value)
-            _original_ws.delete_rows(temp)
+                value_list.append(_main_ws[str(get_column_letter(i)) + str(temp)].value)
+            _main_ws.delete_rows(temp)
             move_over_sheet(value_list, sheet)
             print('AH{} SPEC INSTR: {}. Continuing'.format(temp, spec))
         temp -= 1
@@ -228,43 +232,43 @@ def filter_spec():
 
 
 def filter_zero_weights():
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     print("Starting...")
     for row in range(1, _end_row):
-        weight = _original_ws['G' + str(temp)].value
-        _master_p = _original_ws['H{0}'.format(str(temp))].value
+        weight = _main_ws['G' + str(temp)].value
+        _master_p = _main_ws['H{0}'.format(str(temp))].value
         if weight == 0 or weight == 0.0 or weight == .0 or weight is None or weight == 0.01:
             print('G{} Weight: {}. Deleting'.format(temp, weight))
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
         elif 0.1 <= weight < 1:  # Between 0 and 1
-            _original_ws['G' + str(temp)] = 1
+            _main_ws['G' + str(temp)] = 1
         else:  # Over 1 lb
             print('G{} Weight: {}. Continuing'.format(temp, weight))
-            _original_ws['G' + str(temp)] = int("{:.0f}".format(weight))  # Formatting weight to 0 decimals
+            _main_ws['G' + str(temp)] = int("{:.0f}".format(weight))  # Formatting weight to 0 decimals
 
         if _master_p == 0:
-            _original_ws['H{0}'.format(str(temp))] = 1
+            _main_ws['H{0}'.format(str(temp))] = 1
         temp -= 1
     print("...Finished")
 
 
 def filter_char_osadx():
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     print("Starting... (removing non-numerics from phone #s)")
     for row in range(1, _end_row):
-        osadx = _original_ws['M' + str(temp)].value
+        osadx = _main_ws['M' + str(temp)].value
         if osadx != "" or osadx is not None:
-            _original_ws['M' + str(temp)] = re.sub("[^0-9]", "", str(osadx))
+            _main_ws['M' + str(temp)] = re.sub("[^0-9]", "", str(osadx))
         temp -= 1
     print("...Finished")
 
 
 def get_data_coord() -> tuple:
     start = 'A1'
-    _end_col = get_column_letter(_original_ws.max_column)
-    _end_row = _original_ws.max_row
+    _end_col = get_column_letter(_main_ws.max_column)
+    _end_row = _main_ws.max_row
     end = (_end_col + str(_end_row))
     return start, end
 
@@ -275,7 +279,7 @@ def filter_ship_via():
     ups = "UP"
     pilot = "PILOT"
     ceva = "CEVA"
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     sheet: Any
     transfer: Bool
@@ -283,7 +287,7 @@ def filter_ship_via():
     for row in range(1, _end_row):
         transfer = False
         sheet = None
-        ship_via_value = _original_ws['X' + str(temp)].value
+        ship_via_value = _main_ws['X' + str(temp)].value
 
         if ship_via_value == "" or ship_via_value is None:
             print('A{} SCAC: {}. Continuing'.format(temp, ship_via_value))
@@ -298,14 +302,14 @@ def filter_ship_via():
             sheet = ups_worksheet
             print('A{} SHIP_VIA: {}. Transferring data'.format(temp, ship_via_value))
         elif ship_via_value == pilot or ship_via_value == ceva:
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
 
         if transfer:
             value_list.clear()
             for i in range(1, 43):
-                value_list.append(_original_ws[str(get_column_letter(i)) + str(temp)].value)
+                value_list.append(_main_ws[str(get_column_letter(i)) + str(temp)].value)
             print(value_list)
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
             move_over_sheet(value_list, sheet)
 
         temp -= 1
@@ -317,7 +321,7 @@ def filter_scac():
     value_list = []
     fedex = "FXGR"
     ups = "UP"
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     sheet: Any
     transfer: Bool
@@ -326,7 +330,7 @@ def filter_scac():
     for row in range(1, _end_row):
         transfer = False
         sheet = None
-        scac_value = _original_ws['AL' + str(temp)].value
+        scac_value = _main_ws['AL' + str(temp)].value
 
         if scac_value == "" or scac_value is None:
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
@@ -341,15 +345,15 @@ def filter_scac():
             sheet = ups_worksheet
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
         else:
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
             print('A{} SCAC: {}. Deleting'.format(temp, scac_value))
 
         if transfer:
             value_list.clear()
             for i in range(1, 43):
-                value_list.append(_original_ws[str(get_column_letter(i)) + str(temp)].value)
+                value_list.append(_main_ws[str(get_column_letter(i)) + str(temp)].value)
             print(value_list)
-            _original_ws.delete_rows(temp)
+            _main_ws.delete_rows(temp)
             move_over_sheet(value_list, sheet)
 
         temp -= 1
@@ -479,8 +483,8 @@ def move_headers():
     header_width = []
     # Get header data
     for i in range(1, 43):
-        header_row.append(_original_ws[str(get_column_letter(i)) + str(1)].value)
-        header_width.append(_original_ws.column_dimensions[get_column_letter(i)].width)
+        header_row.append(_main_ws[str(get_column_letter(i)) + str(1)].value)
+        header_width.append(_main_ws.column_dimensions[get_column_letter(i)].width)
 
     for sheet in my_wb.worksheets:
         sheet.append(header_row)
@@ -586,11 +590,11 @@ def filter_PR():
     global pr_header
     header_row = []
     value_list = []
-    _end_row = _original_ws.max_row
+    _end_row = _main_ws.max_row
     temp = _end_row
     print("Starting...")
     for row in range(1, _end_row):
-        state = _original_ws['O' + str(temp)].value
+        state = _main_ws['O' + str(temp)].value
         if state == "PR":
             print('O{} State: {}. Moving'.format(temp, state))
 
@@ -599,7 +603,7 @@ def filter_PR():
 
                 if not pr_header:
                     for i in range(1, 43):
-                        header_row.append(_original_ws[str(get_column_letter(i)) + str(1)].value)
+                        header_row.append(_main_ws[str(get_column_letter(i)) + str(1)].value)
                     try:
                         my_wb["PR"].append(header_row)
                     except:
@@ -608,8 +612,8 @@ def filter_PR():
 
             print(f"Moving row over to sheet {my_wb['PR']}")
             for i in range(1, 43):  # Copying original cell values
-                value_list.append(_original_ws[str(get_column_letter(i)) + str(temp)].value)
-            _original_ws.delete_rows(temp)
+                value_list.append(_main_ws[str(get_column_letter(i)) + str(temp)].value)
+            _main_ws.delete_rows(temp)
             try:
                 move_over_sheet(value_list, my_wb['PR'])
             except:
@@ -644,9 +648,9 @@ def rewrite_ups():
 
 def filter_main():
 
-    #filter_red_new()
+    filter_red_new()
 
-    filter_red()  # slow as hell, deprecated
+    #filter_red()  # slow as hell, deprecated
     filter_freight()  # TP, PI, P
     filter_zero_weights()
     filter_customer_name()
@@ -668,7 +672,7 @@ def filter_main():
     # create_batches()  # Rough draft
     save()
 
-    sort_sheets() #  Sort stopped working
+    sort_sheets()
     save()
 
     color_masterpacks()
