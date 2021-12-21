@@ -374,21 +374,37 @@ def filter_scac():
     temp = _end_row
     sheet: Any
     transfer: Bool
+    ground = "GROUND"
+    home = "HOME"
 
     print("Starting...")
     for row in range(1, _end_row):
         transfer = False
         sheet = None
         scac_value = main_ws['AL' + str(temp)].value
+        spec = main_ws['AH' + str(temp)].value
         freight = main_ws['Y' + str(temp)].value
         if scac_value == "" or scac_value is None:
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
         elif scac_value == fedex:
             #  move to fedex sheet
             transfer = True
+            if spec is None or spec is '':
+                pass
+            else:
+                print(f"SPEC : {spec}")
+                if "FED" in spec:  # check if special instructions contains the word "FED"
+                    transfer = True
+                    if ground in spec or "GND" in spec:
+                        main_ws['AH' + str(temp)] = "FEDEX GROUND"
+                    elif home in spec:
+                        main_ws['AH' + str(temp)] = "FEDEX HOME DELIVERY"
+
             if freight == 'TP':
                 sheet = fedex_TP_worksheet
             else:
+                main_ws['AJ' + str(temp)] = '396428580'
+                main_ws['AK' + str(temp)] = '570'
                 sheet = fedex_PP_worksheet
             print('A{} SCAC: {}. Transferring data'.format(temp, scac_value))
         elif scac_value[0:2] == ups:
@@ -725,12 +741,24 @@ def create_sheets():
     ups_kohls_worksheet = main_wb["UPS_KOHLS"]
 
 
+def rewrite_fedex(_my_wb):
+
+    for sheet in _my_wb.worksheets:
+        if "FED" not in sheet.title:
+            continue
+        _end_row = sheet.max_row
+        sheet.move_range(f"AJ1:AK{end_row}", rows=0, cols=-12)
+        sheet.delete_cols(26, 7)
+        sheet.delete_cols(31, 6)
+
+
 def color_and_rewrite(split_orders):
     _my_wb = load_workbook("_delete_1.xlsx")
 
     color_masterpacks(_my_wb)
     color_splits(_my_wb, split_orders)
     rewrite_ups(_my_wb)
+    rewrite_fedex(_my_wb)
 
     try:
         _my_wb.save('_sorted.xlsx')
@@ -748,7 +776,7 @@ def cleanup():
 
 def filter_main():
 
-    split_orders = gather_split_orders()  # fkn pandas removes colors so I have to check for splits before I clean up the spreadsheet, slowing it down.
+    split_orders = gather_split_orders()  # fkn pandas removes colors so I have to check for splits before I clean up the spreadsheet, slowing it down.  (actually it's pretty fast)
     # BUT I can check for splits legit after cleaning up by checking on each sheet, nested for loop, outer nest get orderA, inner loop check if orderA = orderB-Z
     filter_red_new()
 
