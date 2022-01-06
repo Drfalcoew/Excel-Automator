@@ -10,7 +10,6 @@ from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill
 import pandas as pd
 
-
 fedex_TP_worksheet: Any
 fedex_PP_worksheet: Any
 ups_worksheet: Any
@@ -29,6 +28,8 @@ end_col = _original_ws.max_column
 pr_header = False
 red_header = False
 
+fedex_sheet_titles = ['FEDEX_TP', 'FEDEX_PP', 'RED', 'FEDEX_KOHLS']
+
 #  initializing var to blue filler color
 masterpack_fill = PatternFill(start_color='8497b0',
                               end_color='8497b0',
@@ -36,6 +37,9 @@ masterpack_fill = PatternFill(start_color='8497b0',
 split_fill = PatternFill(start_color='66FF66',
                          end_color='66FF66',
                          fill_type='solid')
+bad_address_fill = PatternFill(start_color='C41E3A',
+                               end_color='C41E3A',
+                               fill_type='solid')
 
 
 def remove_batched(_sorted):
@@ -67,7 +71,7 @@ def remove_batched(_sorted):
     except Exception as e:
         print(f"Cannot delete rows, error: {e}")
         print(f"Can't sort writer to excel: {e}")
-        #filter_red()
+        # filter_red()
 
     print("Finished")
 
@@ -578,17 +582,22 @@ def sort_sheets():  # this screws up blue color for masterpacks, need to fill co
         df = pd.read_excel(_file_name, engine='openpyxl', sheet_name=sheet.title)
         writer = pd.ExcelWriter(_file_name, engine='openpyxl')
         writer.book = book
+        sorted : Any
 
         ## ExcelWriter for some reason uses writer.sheets to access the sheet.
         ## If you leave it empty it will not know that sheet Main is already there
         ## and will create a new sheet.
 
         writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
-        sorted = df.sort_values('PRDNO')
+        if sheet.title == 'UPS':
+            sorted = df.sort_values(['CUSNO', 'PRDNO'])
+        else:
+            sorted = df.sort_values('PRDNO')
         print(sorted)
         sorted.to_excel(writer, sheet.title, index=False)
 
         writer.save()
+
         print("FINISHED SORTING")
 
 
@@ -742,7 +751,6 @@ def create_sheets():
 
 
 def rewrite_fedex(_my_wb):
-
     for sheet in _my_wb.worksheets:
         if "FED" not in sheet.title:
             continue
@@ -755,6 +763,8 @@ def rewrite_fedex(_my_wb):
 def color_and_rewrite(split_orders):
     _my_wb = load_workbook("_delete_1.xlsx")
 
+    format_spec(_my_wb)
+    check_bad_address(_my_wb)
     color_masterpacks(_my_wb)
     color_splits(_my_wb, split_orders)
     rewrite_ups(_my_wb)
@@ -764,6 +774,33 @@ def color_and_rewrite(split_orders):
         _my_wb.save('_sorted.xlsx')
     except:
         print("ERROR saving to '_sorted.xlsx'")
+
+def format_spec(_my_wb):
+    for sheet in _my_wb.worksheets:
+        if sheet.title in fedex_sheet_titles:
+            max_row = sheet.max_row
+            for row in range(1, max_row+1):
+                print(f"FORMATTING SPEC IN SHEET: {sheet.title} on ROW: {row}")
+
+                if sheet['AH' + str(row)].value == "" or sheet['AH' + str(row)].value is None:
+                    sheet['AH' + str(row)] = "FEDEX GROUND"
+
+
+def check_bad_address(my_wb):
+    global main_wb
+    for sheet in my_wb.worksheets:
+
+        _end_row = sheet.max_row
+        temp = _end_row
+        print("Starting... ")
+        for row in range(1, _end_row):
+            osad1 = sheet['K' + str(temp)].value
+
+            if osad1 is not None and osad1[0].isdigit() == False:
+                print("(Checking bad addresses. Filling with red)")
+                sheet['K' + str(temp)].fill = bad_address_fill
+            temp -= 1
+        print("...Finished")
 
 
 def cleanup():
@@ -775,7 +812,6 @@ def cleanup():
 
 
 def filter_main():
-
     split_orders = gather_split_orders()  # fkn pandas removes colors so I have to check for splits before I clean up the spreadsheet, slowing it down.  (actually it's pretty fast)
     # BUT I can check for splits legit after cleaning up by checking on each sheet, nested for loop, outer nest get orderA, inner loop check if orderA = orderB-Z
     filter_red_new()
@@ -802,7 +838,7 @@ def filter_main():
     save()  # save _delete.xlsx
 
     sort_sheets()
-    create_batches()
+    #create_batches()  this causes sort_sheets() not to work. ? (I think)
 
     color_and_rewrite(split_orders)  # Saves to new sheet called '_sorted.xlsx'
 
