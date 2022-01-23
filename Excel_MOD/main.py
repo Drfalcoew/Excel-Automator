@@ -33,13 +33,16 @@ fedex_sheet_titles = ['FEDEX_TP', 'FEDEX_PP', 'RED', 'FEDEX_KOHLS']
 #  initializing var to blue filler color
 masterpack_fill = PatternFill(start_color='8497b0',
                               end_color='8497b0',
-                              fill_type='solid')
+                              fill_type='solid')  # blue
 split_fill = PatternFill(start_color='66FF66',
                          end_color='66FF66',
-                         fill_type='solid')
+                         fill_type='solid')  # green
 bad_address_fill = PatternFill(start_color='C41E3A',
                                end_color='C41E3A',
-                               fill_type='solid')
+                               fill_type='solid')  # red
+new_customer_fill = PatternFill(start_color='38cfc7',
+                                end_color='38cfc7',
+                                fill_type='solid')
 
 
 def remove_batched(_sorted):
@@ -48,6 +51,7 @@ def remove_batched(_sorted):
     _end_row = _original_ws.max_row
     temp = _end_row
     sheet = 'Sheet1'
+    red = False
 
     writer = pd.ExcelWriter('_delete_1.xlsx', engine='openpyxl')
 
@@ -59,20 +63,20 @@ def remove_batched(_sorted):
         print('row: {}, batch: {}'.format(row, batch_num))
         if batch_num == 0:
             continue
+        red = True
         min_del = row
         break
     try:
-        print(f"MIN_DEL: {min_del}")
-        _sorted.drop(index=_sorted.index[min_del - 2:_original_ws.max_row], axis=0, inplace=True)
-        _sorted.to_excel(writer, 'Sheet1', index=False)
-        writer.save()
-        print(_sorted)
-
+        if red:
+            print(f"MIN_DEL: {min_del}")
+            _sorted.drop(index=_sorted.index[min_del - 2:_original_ws.max_row], axis=0, inplace=True)
     except Exception as e:
         print(f"Cannot delete rows, error: {e}")
         print(f"Can't sort writer to excel: {e}")
         # filter_red()
 
+    _sorted.to_excel(writer, 'Sheet1', index=False)
+    writer.save()
     print("Finished")
 
 
@@ -207,7 +211,14 @@ def filter_customer_name():
             print('AP{} Customer Name: {}. Marking as fedex'.format(temp, customer_name))
         elif customer_name == qvc:
             main_ws['X' + str(temp)].value = "UPS"
-        elif customer_name == dunhams or customer_name == bj or customer_name == walmart or customer_name == scheels or customer_name == walmart_1:
+        elif customer_name == scheels:
+            if main_ws['Y' + str(temp)].value == "TP":
+                main_ws['X' + str(temp)] = "Fedex"
+            else:
+                main_ws.delete_rows(temp)
+                temp -= 1
+                continue
+        elif customer_name == dunhams or customer_name == bj or customer_name == walmart or customer_name == walmart_1:
             print('AP{} Customer Name: {}. Deleting'.format(temp, customer_name))
             main_ws.delete_rows(temp)
         else:
@@ -230,6 +241,7 @@ def filter_spec():
     transfer: Bool
     print("Starting...")
     for row in range(1, _end_row):
+        # noinspection PyTypeChecker
         transfer = False
         value_list.clear()
         spec = main_ws['AH' + str(temp)].value
@@ -242,6 +254,7 @@ def filter_spec():
             main_ws.delete_rows(temp)
         else:
             if "FED" in spec:  # check if special instructions contains the word "FED"
+                # noinspection PyTypeChecker
                 transfer = True
                 if ground in spec or "GND" in spec:
                     main_ws['AH' + str(temp)] = "FEDEX GROUND"
@@ -257,6 +270,7 @@ def filter_spec():
                         sheet = fedex_PP_worksheet
 
             elif spec == "SHIP VIA UPS GROUND":
+                # noinspection PyTypeChecker
                 transfer = True
                 if cust == kohls:
                     sheet = ups_kohls_worksheet
@@ -283,7 +297,13 @@ def filter_zero_weights():
     print("Starting...")
     for row in range(1, _end_row):
         weight = main_ws['G' + str(temp)].value
-        _master_p = main_ws['H{0}'.format(str(temp))].value
+        _master_p = main_ws['H' + str(temp)].value
+        if _master_p < 1 and weight >= 0.1 and weight is not None:
+            if main_ws['E' + str(temp)].value == "DRH20":
+                print("breakpoint")
+            print(f"MASTERPACK ZERO (ROW: {row}, MP: {_master_p}). Assigning 1.")
+            main_ws['H{0}'.format(str(temp))] = 1
+
         if weight == 0 or weight == 0.0 or weight == .0 or weight is None or weight == 0.01:
             print('G{} Weight: {}. Deleting'.format(temp, weight))
             main_ws.delete_rows(temp)
@@ -293,8 +313,6 @@ def filter_zero_weights():
             print('G{} Weight: {}. Continuing'.format(temp, weight))
             main_ws['G' + str(temp)] = int("{:.0f}".format(weight))  # Formatting weight to 0 decimals
 
-        if _master_p == 0:
-            main_ws['H{0}'.format(str(temp))] = 1
         temp -= 1
     print("...Finished")
 
@@ -334,6 +352,7 @@ def filter_ship_via():
     transfer: Bool
     print("Starting... (SHIP VIA)")
     for row in range(1, _end_row):
+        # noinspection PyTypeChecker
         transfer = False
         sheet = None
         ship_via_value = main_ws['X' + str(temp)].value
@@ -343,6 +362,7 @@ def filter_ship_via():
             print('A{} SCAC: {}. Continuing'.format(temp, ship_via_value))
         elif ship_via_value == fx:
             #  move to fedex sheet
+            # noinspection PyTypeChecker
             transfer = True
             if freight == 'TP':
                 sheet = fedex_TP_worksheet
@@ -351,6 +371,7 @@ def filter_ship_via():
             print('A{} SHIP_VIA: {}. Transferring data'.format(temp, ship_via_value))
         elif ship_via_value[0:2] == ups:
             #  move to ups sheet
+            # noinspection PyTypeChecker
             transfer = True
             sheet = ups_worksheet
             print('A{} SHIP_VIA: {}. Transferring data'.format(temp, ship_via_value))
@@ -383,6 +404,7 @@ def filter_scac():
 
     print("Starting...")
     for row in range(1, _end_row):
+        # noinspection PyTypeChecker
         transfer = False
         sheet = None
         scac_value = main_ws['AL' + str(temp)].value
@@ -392,12 +414,14 @@ def filter_scac():
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
         elif scac_value == fedex:
             #  move to fedex sheet
+            # noinspection PyTypeChecker
             transfer = True
             if spec is None or spec is '':
                 pass
             else:
                 print(f"SPEC : {spec}")
                 if "FED" in spec:  # check if special instructions contains the word "FED"
+                    # noinspection PyTypeChecker
                     transfer = True
                     if ground in spec or "GND" in spec:
                         main_ws['AH' + str(temp)] = "FEDEX GROUND"
@@ -413,6 +437,7 @@ def filter_scac():
             print('A{} SCAC: {}. Transferring data'.format(temp, scac_value))
         elif scac_value[0:2] == ups:
             #  move to ups sheet
+            # noinspection PyTypeChecker
             transfer = True
             sheet = ups_worksheet
             print('A{} SCAC: {}. Continuing'.format(temp, scac_value))
@@ -466,8 +491,7 @@ def masterpacks(sheet):
     for _ in range(1, _end_row - 1):
         open_q = sheet['F' + str(temp)].value
         prod = sheet['E' + str(temp)].value
-
-        master_p = sheet['H{0}'.format(str(temp))].value
+        master_p = sheet['H' + str(temp)].value
 
         if open_q is not None and open_q > 1 and master_p != 1:
             print(f"Row {temp} is a masterpack")
@@ -582,17 +606,16 @@ def sort_sheets():  # this screws up blue color for masterpacks, need to fill co
         df = pd.read_excel(_file_name, engine='openpyxl', sheet_name=sheet.title)
         writer = pd.ExcelWriter(_file_name, engine='openpyxl')
         writer.book = book
-        sorted : Any
+        sorted: Any
 
         ## ExcelWriter for some reason uses writer.sheets to access the sheet.
         ## If you leave it empty it will not know that sheet Main is already there
         ## and will create a new sheet.
 
         writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
-        if sheet.title == 'UPS':
-            sorted = df.sort_values(['CUSNO', 'PRDNO'])
-        else:
-            sorted = df.sort_values('PRDNO')
+
+        sorted = df.sort_values(['CUSNO', 'PRDNO'])
+
         print(sorted)
         sorted.to_excel(writer, sheet.title, index=False)
 
@@ -603,29 +626,36 @@ def sort_sheets():  # this screws up blue color for masterpacks, need to fill co
 
 def create_batches():
     print("-----CREATING BATCHES------")
-    global main_wb
-    global fedex_PP_worksheet
-    worksheet = fedex_PP_worksheet  # assigning here just for testing. Later I will need to loop through each sheet, pref from outside the func sending a parameter.. cleaner
+    _my_wb = load_workbook('_sorted.xlsx')
+
     value_list = []
 
     count: int  # Going to use this to count how many in a batch. if prod == nxt_prod * 10, insert line, otherwise... --> ?
     prod: str  # product name "PRDNO"
     nxt_prod: str
 
-    _end_row = worksheet.max_row
-    temp = _end_row  # I think I can increment from top down on this one. otherwise (down to up) use temp to control flow
-    # I need to make sure to insert line on top of product * 10. so insert(row - count) (top) as well as insert(row) (bottom)
+    for sheet in _my_wb.worksheets:
 
-    # you could do..., first get all prod != nxtProd row lines, then in another loop, do insert row at line_breaks[i] + i (5 + 0, 24 + 1, 65 + 2)
-    for row in range(2, _end_row):
-        temp -= 1
-    if worksheet['E' + str(temp)].value != worksheet['E' + str((temp - 1))].value:
-        print(temp, worksheet['E' + str(temp)].value, worksheet['E' + str((temp - 1))].value)
-        print(f"Inserting row at {temp}")
-        worksheet.insert_rows(temp)
+        _end_row = sheet.max_row
+        temp = _end_row  # I think I can increment from top down on this one. otherwise (down to up) use temp to control flow
+        # I need to make sure to insert line on top of product * 10. so insert(row - count) (top) as well as insert(row) (bottom)
+        # you could do..., first get all prod != nxtProd row lines, then in another loop, do insert row at line_breaks[i] + i (5 + 0, 24 + 1, 65 + 2)
 
-    save()
+        if sheet.title == "FEDEX_PP":
+            continue
 
+        for row in range(2, _end_row):
+            if sheet['C' + str(temp)].value != sheet['C' + str((temp - 1))].value:
+                print(temp, sheet['C' + str(temp)].value, sheet['C' + str((temp - 1))].value)
+                print(f"Inserting row at {temp}")
+                sheet.insert_rows(temp)
+                sheet["A" + str(temp)].fill = new_customer_fill
+                sheet["A" + str(temp)] = "New Customer"
+            temp -= 1
+    try:
+        _my_wb.save('_sorted.xlsx')
+    except:
+        print("ERROR saving to '_sorted.xlsx'")
 
 def gather_split_orders():
     split_orders = list()
@@ -760,6 +790,26 @@ def rewrite_fedex(_my_wb):
         sheet.delete_cols(31, 6)
 
 
+def red_fedex_columns(_my_wb):
+    columns = ['F', 'H', 'I']
+    for sheet in _my_wb.worksheets:
+        if "FED" not in sheet.title:
+            continue
+        for column in columns:
+            sheet[column + str(1)].fill = bad_address_fill
+
+
+def reposition_phone_numbers(_my_wb):
+    for sheet in _my_wb.worksheets:
+        _end_row = sheet.max_row
+        for row in range(1, _end_row):
+            val_in_col_l = sheet["L" + str(row)].value
+            if val_in_col_l:
+                if len(re.sub("[^0-9]", "", val_in_col_l)) > 9:
+                    sheet["L" + str(row)] = None
+                    sheet["M" + str(row)] = re.sub("[^0-9]", "", val_in_col_l)
+
+
 def color_and_rewrite(split_orders):
     _my_wb = load_workbook("_delete_1.xlsx")
 
@@ -769,21 +819,25 @@ def color_and_rewrite(split_orders):
     color_splits(_my_wb, split_orders)
     rewrite_ups(_my_wb)
     rewrite_fedex(_my_wb)
+    red_fedex_columns(_my_wb)
+    reposition_phone_numbers(_my_wb)
 
     try:
         _my_wb.save('_sorted.xlsx')
     except:
         print("ERROR saving to '_sorted.xlsx'")
 
+
 def format_spec(_my_wb):
     for sheet in _my_wb.worksheets:
         if sheet.title in fedex_sheet_titles:
             max_row = sheet.max_row
-            for row in range(1, max_row+1):
+            for row in range(1, max_row + 1):
                 print(f"FORMATTING SPEC IN SHEET: {sheet.title} on ROW: {row}")
 
                 if sheet['AH' + str(row)].value == "" or sheet['AH' + str(row)].value is None:
                     sheet['AH' + str(row)] = "FEDEX GROUND"
+
 
 
 def check_bad_address(my_wb):
@@ -807,8 +861,12 @@ def cleanup():
     try:
         os.remove("_delete.xlsx")
         os.remove("_delete_1.xlsx")
-    except:
-        print("File removed successfully")
+    except Exception as e:
+        print(f"ERROR deleting files: {e}")
+    else:
+        print("Files removed successfully")
+    finally:
+        print("___Finished___")
 
 
 def filter_main():
@@ -838,9 +896,9 @@ def filter_main():
     save()  # save _delete.xlsx
 
     sort_sheets()
-    #create_batches()  this causes sort_sheets() not to work. ? (I think)
 
     color_and_rewrite(split_orders)  # Saves to new sheet called '_sorted.xlsx'
+    create_batches()  # this causes sort_sheets() not to work. ? (I think)
 
     cleanup()
 
