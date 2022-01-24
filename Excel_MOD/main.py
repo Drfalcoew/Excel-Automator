@@ -630,7 +630,7 @@ def create_batches():
 
     value_list = []
 
-    count: int  # Going to use this to count how many in a batch. if prod == nxt_prod * 10, insert line, otherwise... --> ?
+    count: int = 0  # Going to use this to count how many in a batch. if prod == nxt_prod * 10, insert line, otherwise... --> ?
     prod: str  # product name "PRDNO"
     nxt_prod: str
 
@@ -641,17 +641,44 @@ def create_batches():
         # I need to make sure to insert line on top of product * 10. so insert(row - count) (top) as well as insert(row) (bottom)
         # you could do..., first get all prod != nxtProd row lines, then in another loop, do insert row at line_breaks[i] + i (5 + 0, 24 + 1, 65 + 2)
 
-        if sheet.title == "FEDEX_PP":
-            continue
+        def batch_customers():
+            nonlocal temp
+            for row in range(2, _end_row):
+                if sheet['C' + str(temp)].value != sheet['C' + str((temp - 1))].value:
+                    print(temp, sheet['C' + str(temp)].value, sheet['C' + str((temp - 1))].value)
+                    sheet.insert_rows(temp)
+                    sheet["A" + str(temp)].fill = new_customer_fill
+                temp -= 1
 
-        for row in range(2, _end_row):
-            if sheet['C' + str(temp)].value != sheet['C' + str((temp - 1))].value:
-                print(temp, sheet['C' + str(temp)].value, sheet['C' + str((temp - 1))].value)
-                print(f"Inserting row at {temp}")
-                sheet.insert_rows(temp)
-                sheet["A" + str(temp)].fill = new_customer_fill
-                sheet["A" + str(temp)] = "New Customer"
-            temp -= 1
+        def batch_products():
+            print("_Batching by product_")
+            nonlocal temp
+            nonlocal count
+            for row in range(2, _end_row):
+                if sheet['E' + str(temp)].value and sheet['E' + str(temp - 1)].value:
+                    if sheet['E' + str(temp)].value[0:3] != sheet['E' + str(temp - 1)].value[0:3]:
+                        print(temp, sheet['E' + str(temp)].value[0:3], sheet['E' + str((temp - 1))].value[0:3])
+                        if count >= 10:  # Only separate by product if there are 10 or more like products.
+                            print(f"Inserting row at {temp}")
+                            sheet.insert_rows(temp)
+                            sheet.insert_rows(temp + count + 2)  # Why is it plus 2?
+                        count = 0
+                    else:
+                        count += 1
+                    temp -= 1
+                else:
+                    temp -= 1
+                    count = 0  # This counts like products. Resetting here because product or next_product is equal to None. (and obviously Prod != None)
+                    print("INSIDE ELSE STATEMENT LINE 665")
+
+        if sheet.title != "FEDEX_PP":
+            batch_customers()
+
+        _end_row = sheet.max_row
+        temp = sheet.max_row  # Resetting temp to new max_row
+
+        batch_products()
+
     try:
         _my_wb.save('_sorted.xlsx')
     except:
